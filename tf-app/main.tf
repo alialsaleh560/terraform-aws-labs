@@ -29,7 +29,30 @@ data "aws_ami" "al2023" {
     values = ["al2023-ami-2023.*-x86_64"]
   }
 }
+#-------------------------------connection to db -data source and role policy-----------------------
+data "terraform_remote_state" "db" {
+  backend = "s3"
+  config = {
+    bucket = "tfstate-482112969377-euc1"
+    key    = "db/terraform.tfstate"
+    region = "eu-central-1"
+  }
+}
 
+# Let the web role read ONLY the database secret
+resource "aws_iam_role_policy" "read_db_secret" {
+  name = "read-db-secret"
+  role = aws_iam_role.web.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "secretsmanager:GetSecretValue"
+      Resource = data.terraform_remote_state.db.outputs.db_secret_arn
+    }]
+  })
+}
 #----------------------------------------------locals-----------------------------------
 locals {
   vpc = data.terraform_remote_state.vpc.outputs
