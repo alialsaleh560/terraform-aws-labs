@@ -13,9 +13,9 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  azs             = slice(data.aws_availability_zones.available.names, 0, 2)
-  public_subnets  = [for i in range(2) : cidrsubnet(var.cidr, 8, i)]
-  private_subnets = [for i in range(2) : cidrsubnet(var.cidr, 8, i + 10)]
+  azs             = slice(data.aws_availability_zones.available.names, 0,var.az_count)
+  public_subnets  = [for i in range(var.az_count) : cidrsubnet(var.cidr, 8, i)]
+  private_subnets = [for i in range(var.az_count) : cidrsubnet(var.cidr, 8, i + 10)]
 }
 
 module "vpc" {
