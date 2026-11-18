@@ -1,0 +1,43 @@
+name: terraform-ci
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.13.1
+      - name: Check formatting
+        run: tofu fmt -check -recursive
+
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - tf-state-bootstrap
+          - tf-lesson1
+          - tf-vpc
+          - tf-app
+          - tf-db
+          - envs/dev
+          - envs/prod
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.13.1
+      - name: Init without backend
+        run: tofu init -backend=false
+      - name: Validate
+        run: tofu validate
