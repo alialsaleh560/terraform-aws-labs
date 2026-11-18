@@ -17,16 +17,16 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
 
   tags = {
-  Name = "${var.name}-vpc"
- }
+    Name = "${var.name}-vpc"
+  }
 }
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-  Name = "${var.name}-igw"
- }
+    Name = "${var.name}-igw"
+  }
 }
 
 resource "aws_subnet" "public" {

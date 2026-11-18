@@ -13,7 +13,7 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  azs             = slice(data.aws_availability_zones.available.names, 0,var.az_count)
+  azs             = slice(data.aws_availability_zones.available.names, 0, var.az_count)
   public_subnets  = [for i in range(var.az_count) : cidrsubnet(var.cidr, 8, i)]
   private_subnets = [for i in range(var.az_count) : cidrsubnet(var.cidr, 8, i + 10)]
 }
