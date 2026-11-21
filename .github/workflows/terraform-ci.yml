@@ -46,6 +46,7 @@ jobs:
         run: tofu init -backend=false
       - name: Validate
         run: tofu validate
+
   plan:
     if: github.event_name == 'pull_request'
     needs: [fmt, validate]
@@ -63,6 +64,11 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version: 1.13.1
+
+      - name: Debug - show OIDC token claims
+        run: |
+          TOKEN=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+          python3 -c "import sys,json,base64; p=sys.argv[1].split('.')[1]; p+='='*(-len(p)%4); d=json.loads(base64.urlsafe_b64decode(p)); print(json.dumps({k:d.get(k) for k in ['sub','aud','iss','repository','event_name']}, indent=2))" "$TOKEN"
 
       - name: Get AWS credentials (OIDC, no keys)
         uses: aws-actions/configure-aws-credentials@v4
@@ -90,4 +96,4 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
               body: `### Plan for \`${{ matrix.dir }}\`\n\`\`\`\n${plan}\n\`\`\``
-            });      
+            });
