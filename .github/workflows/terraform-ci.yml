@@ -1,14 +1,14 @@
 name: terraform-ci
 
 on:
-permissions:
-  contents: read        # read the repo code
-  id-token: write       # allow requesting an OIDC token from GitHub
-  pull-requests: write  # allow posting the plan as a PR comment
-  
   pull_request:
   push:
     branches: [master]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
 
 jobs:
   fmt:
