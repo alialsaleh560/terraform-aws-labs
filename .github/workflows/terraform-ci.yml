@@ -1,6 +1,11 @@
 name: terraform-ci
 
 on:
+permissions:
+  contents: read        # read the repo code
+  id-token: write       # allow requesting an OIDC token from GitHub
+  pull-requests: write  # allow posting the plan as a PR comment
+  
   pull_request:
   push:
     branches: [master]
@@ -41,3 +46,48 @@ jobs:
         run: tofu init -backend=false
       - name: Validate
         run: tofu validate
+  plan:
+    if: github.event_name == 'pull_request'
+    needs: [fmt, validate]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [envs/dev, envs/prod]
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.13.1
+
+      - name: Get AWS credentials (OIDC, no keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Init (with the S3 backend)
+        run: tofu init -input=false
+
+      - name: Plan
+        run: |
+          tofu plan -input=false -no-color -lock-timeout=60s -out=tfplan
+          tofu show -no-color tfplan > plan.txt
+
+      - name: Post plan as a PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let plan = fs.readFileSync('${{ matrix.dir }}/plan.txt', 'utf8');
+            if (plan.length > 60000) plan = plan.slice(0, 60000) + '\n... (truncated)';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### Plan for \`${{ matrix.dir }}\`\n\`\`\`\n${plan}\n\`\`\``
+            });      
