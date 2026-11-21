@@ -33,5 +33,6 @@ module "vpc" {
 
   tags = {
     Environment = var.environment
+    ManagedBy   = "opentofu"
   }
 }
