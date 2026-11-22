@@ -28,6 +28,7 @@ jobs:
       matrix:
         dir:
           - tf-state-bootstrap
+          - tf-ci-oidc
           - tf-lesson1
           - tf-vpc
           - tf-app
@@ -65,11 +66,6 @@ jobs:
         with:
           tofu_version: 1.13.1
 
-      - name: Debug - show OIDC token claims
-        run: |
-          TOKEN=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
-          python3 -c "import sys,json,base64; p=sys.argv[1].split('.')[1]; p+='='*(-len(p)%4); d=json.loads(base64.urlsafe_b64decode(p)); print(json.dumps({k:d.get(k) for k in ['sub','aud','iss','repository','event_name']}, indent=2))" "$TOKEN"
-
       - name: Get AWS credentials (OIDC, no keys)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -97,3 +93,65 @@ jobs:
               issue_number: context.issue.number,
               body: `### Plan for \`${{ matrix.dir }}\`\n\`\`\`\n${plan}\n\`\`\``
             });
+
+  apply-dev:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [fmt, validate]
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency: apply-dev
+    defaults:
+      run:
+        working-directory: envs/dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.13.1
+
+      - name: Get AWS credentials (apply role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Init
+        run: tofu init -input=false
+
+      - name: Plan
+        run: tofu plan -input=false -no-color -lock-timeout=60s -out=tfplan
+
+      - name: Apply
+        run: tofu apply -input=false -lock-timeout=60s tfplan
+
+  apply-prod:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [apply-dev]
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency: apply-prod
+    defaults:
+      run:
+        working-directory: envs/prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.13.1
+
+      - name: Get AWS credentials (apply role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Init
+        run: tofu init -input=false
+
+      - name: Plan
+        run: tofu plan -input=false -no-color -lock-timeout=60s -out=tfplan
+
+      - name: Apply
+        run: tofu apply -input=false -lock-timeout=60s tfplan
