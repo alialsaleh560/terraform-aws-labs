@@ -10,13 +10,15 @@ These labs are built to be cheap and easy to tear down. This file lists what I w
 | Bootstrap state kept on my laptop | Bootstrap state migrated into the bucket after the first apply, or the bucket created once by hand and imported |
 | One account for everything | A separate state bucket per AWS account (dev, staging, prod), so a mistake in dev can't touch prod state |
 
-## Identity (tf-lesson1)
+## Identity (tf-lesson1, tf-ci-oidc)
 
 | Lab | Production |
 |---|---|
 | IAM users created by Terraform | No IAM users for people. Humans sign in through IAM Identity Center (SSO) and assume roles |
-| My own admin user with long-term access keys | Short-lived credentials from SSO for local work. CI uses an OIDC role (for example GitHub Actions to AWS) with no stored keys |
-| AWS managed policies (ReadOnlyAccess) | Custom least-privilege policies, reviewed in pull requests |
+| My own admin user with long-term access keys for local work | Short-lived credentials from SSO for local work |
+| CI already uses OIDC with no stored keys (github-plan and github-apply roles) | Same |
+| AWS managed policies (ReadOnlyAccess, AmazonVPCFullAccess) | Custom least-privilege policies with only the actions each project uses, reviewed in pull requests |
+| One apply role trusted by both the dev and prod environments | A separate apply role per environment, ideally in separate AWS accounts, so a dev job can never touch prod |
 
 ## Network (tf-vpc)
 
@@ -64,12 +66,15 @@ These labs are built to be cheap and easy to tear down. This file lists what I w
 | | When replacing a rule, add the new one first, apply, then remove the old one, so the connection never drops |
 | Destroy order learned by trial | Documented order: destroy what reads other projects first (app, then db, then vpc) |
 
-## Workflow
+## Workflow (CI/CD)
 
 | Lab | Production |
 |---|---|
-| plan and apply from my laptop | Pull request runs fmt, validate, tflint and a security scan (Checkov or Trivy), then posts the plan. Apply only runs from CI after review and merge |
-| Saved plan file (plan -out) | Same, the CI apply uses exactly the plan that was reviewed |
-| One environment | Separate dev, staging and prod, ideally in separate AWS accounts, sharing the same modules with different variables |
-| Few tags | Required tags on every resource (environment, owner, project, cost center), set once with default_tags on the provider |
+| Pull requests run fmt, validate and plan, and the plan is posted as a comment | Same, plus tflint and a security scan (Checkov or Trivy) |
+| Merge to master applies dev automatically, then prod after a manual approval | Same, with at least one reviewer who is not the author ("prevent self-review" on) |
+| Apply jobs plan and apply in the same job (plan -out, then apply the file) | Same, or apply the exact plan file that was reviewed on the PR, stored as a build artifact |
+| Branch ruleset on master requiring a PR and passing checks | Same, plus required reviews and CODEOWNERS for sensitive folders such as tf-ci-oidc |
+| CI only plans and applies envs/ | Every project goes through CI. Nothing is applied from a laptop, except the one-time bootstrap |
+| dev and prod in one AWS account | Separate accounts, sharing the same modules with different variables |
+| A few tags set per module | Required tags on every resource (environment, owner, project, cost center), set once with default_tags on the provider |
 | Manual cost checks | AWS Budgets alerts and cost reports by tag |
