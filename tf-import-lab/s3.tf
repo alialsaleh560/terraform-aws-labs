@@ -9,6 +9,8 @@ resource "aws_s3_bucket" "legacy_reports" {
   tags = {
     Team      = "finance"
     Managedby = "opentofu"
+    Purpose   = "lab-test"
+
   }
 }
 
